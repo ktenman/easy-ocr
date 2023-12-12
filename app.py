@@ -1,10 +1,10 @@
-from flask import Flask, request, jsonify
-import cv2
-import numpy as np
 import base64
-from pydantic import BaseModel, ValidationError
-import logging
+import cv2
 import easyocr
+import logging
+import numpy as np
+from flask import Flask, request, jsonify
+from pydantic import BaseModel, ValidationError
 
 # Initialize the OCR reader
 reader = easyocr.Reader(['en'], gpu=False)  # Set 'gpu' to False if you're not using a GPU
