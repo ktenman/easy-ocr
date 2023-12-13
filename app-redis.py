@@ -39,7 +39,7 @@ def perform_ocr(preprocessed_img):
 def publish_result(redis_client, extracted_text):
     try:
         redis_client.publish(IMAGE_RESPONSE_QUEUE, f"{thread_local_storage.uuid}:{extracted_text}")
-        logging.debug("Published result to 'response-queue'")
+        logging.debug(f"Published result to '{IMAGE_RESPONSE_QUEUE}'")
     except redis.exceptions.ConnectionError as e:
         logging.error(f"Redis Connection Error while publishing: {e}")
 
