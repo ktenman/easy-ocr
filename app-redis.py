@@ -7,6 +7,7 @@ import redis
 import threading
 import time
 from pydantic import BaseModel, ValidationError
+import os
 
 IMAGE_REQUEST_QUEUE = 'image-request-queue'
 IMAGE_RESPONSE_QUEUE = 'image-response-queue'
@@ -75,7 +76,8 @@ def handle_message(redis_client, message):
         del thread_local_storage.uuid
 
 def create_redis_client():
-    return redis.Redis(host='tenman.ee', port=6379, db=0, socket_timeout=5)
+    redis_password = os.getenv('REDIS_PASSWORD')
+    return redis.Redis(host='tenman.ee', port=6379, db=0, password=redis_password, socket_timeout=5)
 
 def subscribe_to_queue(redis_client):
     pubsub = redis_client.pubsub()
