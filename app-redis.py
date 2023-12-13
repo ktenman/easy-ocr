@@ -8,6 +8,9 @@ import threading
 import time
 from pydantic import BaseModel, ValidationError
 
+IMAGE_REQUEST_QUEUE = 'image-request-queue'
+IMAGE_RESPONSE_QUEUE = 'image-response-queue'
+
 # Initialize the OCR reader
 reader = easyocr.Reader(['en'], gpu=True)  # Set 'gpu' to False if you're not using a GPU
 
@@ -35,7 +38,7 @@ def perform_ocr(preprocessed_img):
 
 def publish_result(redis_client, extracted_text):
     try:
-        redis_client.publish('image-response-queue', f"{thread_local_storage.uuid}:{extracted_text}")
+        redis_client.publish(IMAGE_RESPONSE_QUEUE, f"{thread_local_storage.uuid}:{extracted_text}")
         logging.debug("Published result to 'response-queue'")
     except redis.exceptions.ConnectionError as e:
         logging.error(f"Redis Connection Error while publishing: {e}")
@@ -80,7 +83,7 @@ def subscribe_to_queue(redis_client):
     def message_handler(message):
         handle_message(redis_client, message)
 
-    pubsub.subscribe(**{'image-request-queue': message_handler})
+    pubsub.subscribe(**{IMAGE_REQUEST_QUEUE: message_handler})
     return pubsub.run_in_thread(sleep_time=0.001)
 
 def check_redis_connection(client):
