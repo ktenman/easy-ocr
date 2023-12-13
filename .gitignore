@@ -6,12 +6,14 @@
 .settings
 .springBeans
 .sts4-cache
+app-redis.log
 
 ### IntelliJ IDEA ###
 .idea
 *.iws
 *.iml
 *.ipr
+.env
 
 ### NetBeans ###
 /nbproject/private/
