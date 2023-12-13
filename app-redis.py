@@ -7,7 +7,10 @@ import redis
 import threading
 import time
 from pydantic import BaseModel, ValidationError
+from dotenv import load_dotenv
 import os
+
+load_dotenv('/Users/tenman/easy-ocr/.env')
 
 IMAGE_REQUEST_QUEUE = 'image-request-queue'
 IMAGE_RESPONSE_QUEUE = 'image-response-queue'
