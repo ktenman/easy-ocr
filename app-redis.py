@@ -33,9 +33,9 @@ def perform_ocr(preprocessed_img):
     logging.debug("OCR performed on the image.")
     return decoded_text.strip() if decoded_text else "No text found"
 
-def publish_result(redis_client, decoded_text):
+def publish_result(redis_client, extracted_text):
     try:
-        redis_client.publish('image-response-queue', f"{thread_local_storage.uuid}:{decoded_text}")
+        redis_client.publish('image-response-queue', f"{thread_local_storage.uuid}:{extracted_text}")
         logging.debug("Published result to 'response-queue'")
     except redis.exceptions.ConnectionError as e:
         logging.error(f"Redis Connection Error while publishing: {e}")
@@ -54,11 +54,11 @@ def handle_message(redis_client, message):
         upload_request = ImageUploadRequest(uuid=uuid, image=encoded_image)
         nparr = np.frombuffer(upload_request.decode_image(), np.uint8)
         preprocessed_img = preprocess_image(nparr)
-        decoded_text = perform_ocr(preprocessed_img)
+        extracted_text = perform_ocr(preprocessed_img)
 
-        logging.info(f"OCR result: {decoded_text}")
+        logging.info(f"OCR result: {extracted_text}")
 
-        publish_result(redis_client, decoded_text)
+        publish_result(redis_client, extracted_text)
 
         end_time = time.perf_counter()
         processing_time = end_time - start_time
