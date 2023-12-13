@@ -6,11 +6,10 @@ import numpy as np
 import redis
 import threading
 import time
-from pydantic import BaseModel, ValidationError
-from dotenv import load_dotenv
 import os
-
-load_dotenv('/Users/tenman/easy-ocr/.env')
+import sys
+import signal
+from pydantic import BaseModel, ValidationError
 
 IMAGE_REQUEST_QUEUE = 'image-request-queue'
 IMAGE_RESPONSE_QUEUE = 'image-response-queue'
@@ -40,12 +39,17 @@ def perform_ocr(preprocessed_img):
     logging.debug("OCR performed on the image.")
     return decoded_text.strip() if decoded_text else "No text found"
 
-def publish_result(redis_client, extracted_text):
+def publish_result(redis_client, extracted_text, retry_count=3):
     try:
         redis_client.publish(IMAGE_RESPONSE_QUEUE, f"{thread_local_storage.uuid}:{extracted_text}")
         logging.debug(f"Published result to '{IMAGE_RESPONSE_QUEUE}'")
-    except redis.exceptions.ConnectionError as e:
-        logging.error(f"Redis Connection Error while publishing: {e}")
+    except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
+        if retry_count > 0:
+            logging.warning(f"Publish retry due to error: {e}. Retries left: {retry_count}")
+            time.sleep(1)  # Wait a bit before retrying
+            publish_result(redis_client, extracted_text, retry_count - 1)
+        else:
+            logging.error(f"Failed to publish result after retries: {e}")
 
 def handle_message(redis_client, message):
     try:
@@ -78,9 +82,14 @@ def handle_message(redis_client, message):
     finally:
         del thread_local_storage.uuid
 
-def create_redis_client():
+def get_redis_connection_pool():
     redis_password = os.getenv('REDIS_PASSWORD')
-    return redis.Redis(host='tenman.ee', port=6379, db=0, password=redis_password, socket_timeout=5)
+    return redis.ConnectionPool(host='tenman.ee', port=6379, db=0, password=redis_password, socket_timeout=5)
+
+redis_connection_pool = get_redis_connection_pool()
+
+def create_redis_client():
+    return redis.Redis(connection_pool=redis_connection_pool)
 
 def subscribe_to_queue(redis_client):
     pubsub = redis_client.pubsub()
@@ -96,6 +105,16 @@ def check_redis_connection(client):
         return client.ping()
     except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError):
         return False
+
+def check_redis_health(redis_client):
+    try:
+        if not redis_client.ping():
+            raise Exception("Redis server not responding")
+        logging.debug("Redis server is healthy")
+    except Exception as e:
+        logging.warning(f"Redis health check failed: {e}")
+        return False
+    return True
 
 class MillisecondFormatter(logging.Formatter):
     def formatTime(self, record, datefmt=None):
@@ -117,23 +136,37 @@ def setup_logging():
     for handler in logging.root.handlers:
         handler.setFormatter(formatter)
 
+def signal_handler(sig, frame):
+    logging.info('Gracefully shutting down...')
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
+
 def main():
     setup_logging()
 
     redis_client = None
-    timeout_seconds = 10
+    timeout_seconds = 5
+    max_timeout = 60
     is_subscribed = False
     is_first_connection = True
 
     while True:
         try:
             if not redis_client or not check_redis_connection(redis_client):
+                if timeout_seconds < max_timeout:
+                    timeout_seconds *= 2  # Exponential backoff
+                else:
+                    timeout_seconds = max_timeout
+
                 redis_client = create_redis_client()
                 is_subscribed = False
 
             if not is_subscribed:
                 subscribe_to_queue(redis_client)
                 is_subscribed = True
+                timeout_seconds = 5  # Reset timeout after successful connection
 
                 if is_first_connection:
                     logging.info("Successfully connected and subscribed to Redis.")
