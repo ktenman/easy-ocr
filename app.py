@@ -7,7 +7,7 @@ from flask import Flask, request, jsonify
 from pydantic import BaseModel, ValidationError
 
 # Initialize the OCR reader
-reader = easyocr.Reader(['en'], gpu=False)  # Set 'gpu' to False if you're not using a GPU
+reader = easyocr.Reader(['en'], gpu=True)  # Set 'gpu' to False if you're not using a GPU
 
 class ImageUploadRequest(BaseModel):
     uuid: str

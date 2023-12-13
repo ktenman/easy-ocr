@@ -3,3 +3,4 @@ opencv-python-headless==4.8.1.78
 pydantic==2.5.2
 numpy==1.26.2
 easyocr==1.7.1
+redis==5.0.1
