@@ -67,7 +67,7 @@ def handle_message(redis_client, message):
         preprocessed_img = preprocess_image(nparr)
         extracted_text = perform_ocr(preprocessed_img)
 
-        logging.info(f"OCR result: {extracted_text}")
+        logging.info(f"OCR result: '{extracted_text}'")
 
         publish_result(redis_client, extracted_text)
 
@@ -151,9 +151,21 @@ def main():
     max_timeout = 60
     is_subscribed = False
     is_first_connection = True
+    health_check_interval = 300  # Interval for Redis health check in seconds
+    last_health_check = time.time()
 
     while True:
         try:
+            current_time = time.time()
+
+            # Check if it's time to perform a health check
+            if current_time - last_health_check >= health_check_interval:
+                if not check_redis_health(redis_client):
+                    logging.warning("Redis health check failed. Attempting to reconnect...")
+                    redis_client = None
+                    is_subscribed = False
+                last_health_check = current_time
+
             if not redis_client or not check_redis_connection(redis_client):
                 if timeout_seconds < max_timeout:
                     timeout_seconds *= 2  # Exponential backoff
