@@ -1,7 +1,8 @@
 # easy-ocr
 ```shell
-launchctl load ~/Library/LaunchAgents/com.user.start_easy_ocr_service.plist
-launchctl unload ~/Library/LaunchAgents/com.user.start_easy_ocr_service.plist
+launchctl unload ~/Library/LaunchAgents/com.user.EasyOcrService.plist
+launchctl load ~/Library/LaunchAgents/com.user.EasyOcrService.plist
+launchctl start com.user.EasyOcrService     
 ```
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -9,12 +10,26 @@ launchctl unload ~/Library/LaunchAgents/com.user.start_easy_ocr_service.plist
 <plist version="1.0">
     <dict>
         <key>Label</key>
-        <string>com.user.start_easy_ocr_service</string>
+        <string>com.user.EasyOcrService</string>
+
         <key>RunAtLoad</key>
         <true/>
-        <key>Program</key>
-        <string>/Users/tenman/easy-ocr/start_easy_ocr_service.sh</string>
+
+        <key>KeepAlive</key>
+        <true/>
+
+        <key>ProgramArguments</key>
+        <array>
+            <string>/bin/bash</string>
+            <string>/Users/tenman/easy-ocr/start_easy_ocr_service.sh</string>
+        </array>
+
+        <key>StandardOutPath</key>
+        <string>/Users/tenman/easy-ocr/launchagent-out.log</string>
+
+        <key>StandardErrorPath</key>
+        <string>/Users/tenman/easy-ocr/launchagent-err.log</string>
+
     </dict>
 </plist>
-
 ```
