@@ -5,3 +5,5 @@ numpy==1.26.2
 easyocr==1.7.1
 redis==5.0.1
 python-dotenv
+tensorflow
+pika==1.3.2
