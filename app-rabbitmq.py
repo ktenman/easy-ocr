@@ -4,14 +4,13 @@ import easyocr
 import logging
 import numpy as np
 import os
-import sys
-import signal
 import pika
+import requests
+import signal
+import sys
 import threading
 import time
-import requests
 from pydantic import BaseModel, ValidationError
-import json
 
 IMAGE_REQUEST_QUEUE = 'picture-request-queue'
 IMAGE_RESPONSE_QUEUE = 'picture-response-queue'
@@ -90,22 +89,28 @@ def handle_message(ch, method, properties, body):
     finally:
         del thread_local_storage.uuid
 
-def make_api_request(prompt):
+
+def make_api_request(prompt, timeout_seconds=60):
     url = "http://localhost:11434/api/generate"
-    data = {"model": "dolphin-mixtral", "prompt": prompt}
-    response = requests.post(url, json=data)
+    data = {
+        "model": "dolphin-mixtral",
+        "prompt": prompt,
+        "stream": False  # Request not to stream the response
+    }
 
-    # Log the raw response for debugging
-    # logging.debug(f"Raw API response: {response.text}")
+    try:
+        response = requests.post(url, json=data, timeout=timeout_seconds)
+        response.raise_for_status()
+        json_response = response.json()
+        logging.debug(f"API response: {json_response}")
+        return json_response
 
-    # Split the response text by new lines and parse each line as JSON
-    lines = response.text.strip().split('\n')
-    json_responses = [json.loads(line) for line in lines if line.strip()]
-
-    # Log the parsed JSON responses for debugging
-    logging.debug(f"Parsed JSON responses: {json_responses}")
-
-    return json_responses
+    except requests.exceptions.Timeout:
+        logging.error("The request timed out")
+    except requests.exceptions.HTTPError as err:
+        logging.error(f"HTTP error occurred: {err}")
+    except requests.exceptions.RequestException as e:
+        logging.error(f"An error occurred: {e}")
 
 def handle_text_request(ch, method, properties, body):
     try:
@@ -115,20 +120,13 @@ def handle_text_request(ch, method, properties, body):
         thread_local_storage.uuid = uuid
         logging.info("Received text request message")
 
-        full_response = ""
-        done = False
+        api_response = make_api_request(prompt)
+        full_response = api_response.get("response", "")
 
-        api_responses = make_api_request(prompt)
-        for api_response in api_responses:
-            full_response += api_response.get("response", "")
-            done = api_response.get("done", False)
-            if done:
-                break
-
-        full_response = full_response.lstrip()  # Remove leading spaces from the final response
+        # Strip leading spaces from the final response
+        full_response = full_response.lstrip()
 
         logging.debug(f"Full response: {full_response}")
-
         publish_result_to_text_queue(ch, uuid, full_response)
 
     except Exception as e:
